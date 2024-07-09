@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBOM Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+
+        #dropZone {
+            border: 2px dashed #ccc;
+            border-radius: 20px;
+            width: 100%;
+            margin: 20px auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #fff;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        #browseButton {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #componentCount {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        #resultArea {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="uploadArea">
+        <div id="dropZone">
+            <p>Drag and drop your CycloneDX JSON SBOM file here, or</p>
+            <input type="file" id="fileInput" accept=".json">
+            <button id="browseButton">Browse Files</button>
+        </div>
+    </div>
+    <div id="resultArea">
+        <div id="componentCount"></div>
+        <table id="componentTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>License</th>
+                    <th>Author</th>
+                    <th>Version</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const browseButton = document.getElementById('browseButton');
+        const resultArea = document.getElementById('resultArea');
+        const componentCount = document.getElementById('componentCount');
+        const componentTable = document.getElementById('componentTable').getElementsByTagName('tbody')[0];
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#e9e9e9';
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#fff';
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#fff';
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            handleFile(file);
+        });
+
+        browseButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        function handleFile(file) {
+            if (file.type !== 'application/json') {
+                alert('Please upload a JSON file.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const sbom = JSON.parse(e.target.result);
+                    if (!sbom.components || !Array.isArray(sbom.components)) {
+                        throw new Error('Invalid SBOM format');
+                    }
+                    displaySBOM(sbom);
+                    uploadArea.style.display = 'none';
+                    resultArea.style.display = 'block';
+                } catch (error) {
+                    alert('Error parsing SBOM file: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displaySBOM(sbom) {
+            const components = sbom.components;
+            componentCount.textContent = `Number of components: ${components.length}`;
+
+            componentTable.innerHTML = '';
+            components.forEach(component => {
+                const row = componentTable.insertRow();
+                const nameCell = row.insertCell(0);
+                const licenseCell = row.insertCell(1);
+                const authorCell = row.insertCell(2);
+                const versionCell = row.insertCell(3);
+
+                nameCell.textContent = component.name || 'N/A';
+
+                // Handle different license formats
+                let licenseText = 'N/A';
+                if (component.licenses) {
+                    licenseText = component.licenses.map(l => {
+                        if (typeof l === 'string') return l;
+                        if (l.license) {
+                            if (typeof l.license === 'string') return l.license;
+                            if (l.license.id) return l.license.id;
+                            if (l.license.name) return l.license.name;
+                        }
+                        return 'Unknown';
+                    }).join(', ');
+                }
+                licenseCell.textContent = licenseText;
+
+                authorCell.textContent = component.author || 'N/A';
+                versionCell.textContent = component.version || 'N/A';
+            });
+        }
+    </script>
+</body>
+
+</html>
